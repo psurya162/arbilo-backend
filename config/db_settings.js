@@ -3,14 +3,14 @@ require('dotenv').config();
 
 class Database {
     constructor() {
-        // this.host = 'localhost';
-        // this.username = 'root';
-        // this.password = '';
-        // this.database = 'db_arbilo';
-        this.host = process.env.DB_HOST; // Correct environment variable
-        this.username = process.env.DB_USER; // You can also use this for username if needed
-        this.password = process.env.DB_PASS; // You can also use this for password if needed
-        this.database = process.env.DB_NAME; // Use environment variable for the database name
+        this.host = 'localhost';
+        this.username = 'root';
+        this.password = '';
+        this.database = 'db_arbilo';
+        // this.host = process.env.DB_HOST; // Correct environment variable
+        // this.username = process.env.DB_USER; // You can also use this for username if needed
+        // this.password = process.env.DB_PASS; // You can also use this for password if needed
+        // this.database = process.env.DB_NAME; // Use environment variable for the database name
         this.conn = mysql.createConnection({
             host: this.host,
             user: this.username,

@@ -140,35 +140,36 @@ const sendCredentialsEmail = async (name, email, password) => {
 
 
 
+
+
 const sendContactUsNotification = async (name, email, message) => {
   try {
-    // Set up the SMTP transporter (using an SMTP service like Mailtrap, SendGrid, etc.)
     const transporter = nodemailer.createTransport({
       host: "smtp.hostinger.com",
       port: 465,
       secure: true, // Use SSL
       auth: {
-        user: "hello@arbilo.com",
+        user: "hello@arbilo.com", // Must be a verified email from your domain
         pass: "Readyio@986",
       },
     });
 
-    const adminEmail = "hello@arbilo.com"; // The admin email to receive contact messages
+    const adminEmail = "hello@arbilo.com"; // Admin's receiving email
     const subject = "New Contact Us Message";
     const text = `
       You have received a new message from the Contact Us form:
-      
+
       Name: ${name}
       Email: ${email}
       Message: ${message}
     `;
 
-    // Send the email
     await transporter.sendMail({
-      from: email, // Sender's email (user's email from the Contact Us form)
-      to: adminEmail, // Admin email to receive the notification
-      subject: subject, // Subject of the email
-      text: text, // Body content of the email
+      from: `"Arbilo Contact Form" <hello@arbilo.com>`, // Use your verified domain email
+      to: adminEmail,
+      subject: subject,
+      text: text,
+      replyTo: email, // Allows the admin to reply to the user directly
     });
 
     console.log("Contact Us notification sent successfully!");
@@ -176,6 +177,7 @@ const sendContactUsNotification = async (name, email, message) => {
     console.error("Error sending Contact Us notification:", err);
   }
 };
+
 
 module.exports = {
   sendWelcomeEmail,
