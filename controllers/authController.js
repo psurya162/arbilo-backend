@@ -18,47 +18,31 @@ const JWT_SECRET = "dfghjnhbgvf";
 const signup = async (req, res) => {
   try {
     // Validate email and password using express-validator
-    await body("email")
-      .isEmail()
-      .withMessage("Please enter a valid email address")
-      .run(req);
-    await body("password")
-      .isLength({ min: 6 })
-      .withMessage("Password must be at least 6 characters long")
-      .run(req);
+    await Promise.all([
+      body("email").isEmail().withMessage("Please enter a valid email address").run(req),
+      body("password").isLength({ min: 6 }).withMessage("Password must be at least 6 characters long").run(req),
+    ]);
 
     const errors = validationResult(req);
-
-    // If there are validation errors, send a detailed response
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
 
     const { name, email, password, confirmPassword } = req.body;
 
-    // Check if the passwords match
     if (password !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
     }
 
-    // Normalize email
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Check if user already exists
-    const existingUser = await db.select(
-      "tbl_users",
-      "*",
-      `email='${normalizedEmail}'`
-    );
-    console.log(existingUser); // Debugging the query result
-
+    // Check if user already exists before sending an email
+    const existingUser = await db.select("tbl_users", "*", `email='${normalizedEmail}'`);
     if (existingUser && existingUser.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "Email is already registered. Please log in." });
+      return res.status(400).json({ message: "Email is already registered. Please log in." });
     }
 
-    // Hash password
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert new user into the database
@@ -68,25 +52,22 @@ const signup = async (req, res) => {
       password: hashedPassword,
     });
 
-    // Send welcome email (optional)
+    // **Send the welcome email only after successful registration**
     await sendWelcomeEmail(name, email);
 
-    // Send success response
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
     console.error(err);
 
-    // Handle duplicate email error
     if (err.code === "ER_DUP_ENTRY") {
-      return res
-        .status(400)
-        .json({ message: "Email is already registered. Please log in." });
+      return res.status(400).json({ message: "Email is already registered. Please log in." });
     }
 
-    // Handle other errors
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
 
 // User Login
 const login = async (req, res) => {
@@ -202,12 +183,7 @@ const forgotPassword = async (req, res) => {
       },
     });
 
-    // const transporter = nodemailer.createTransport({
-    //   host: '145.223.23.3',  // Your server's public IP or hostname
-    //   port: 1025,            // MailHog's SMTP port
-    //   secure: false,         // No SSL
-    //   auth: false,
-    // });
+  
 
     // const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
     const resetLink = `https://arbilo.com/reset-password/${resetToken}`;

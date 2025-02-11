@@ -3,10 +3,28 @@ const ccxt = require('ccxt');
 class CryptoArbitrageService {
     constructor() {
         this.exchangeNames = [
-            'binance', 'bybit', 'coinbase', 'okx', 'crypto.com',
-            'upbit', 'gate.io', 'bitget', 'mexc', 'htx',
-            'kraken', 'kucoin', 'bitfinex', 'bitmart', 'bitmex',
-            'poloniex', 'bittrex', 'hitbtc', 'whitebit', 'ascendex'
+            'binance', 
+            'bybit', 
+            'p2b',
+            'xt',
+            'woo',
+            'okx', 
+            'crypto.com', 
+            'gate.io', 
+            'bitget', 
+            'mexc', 
+            'htx',
+            'kraken', 
+            'kucoin', 
+            'bitfinex', 
+            'bitmart', 
+            'bitmex',
+            'poloniex', 
+            'probit',
+            'phemex',
+            'whitebit', 
+            'ascendex',
+            'bitget',
         ];
         
         
