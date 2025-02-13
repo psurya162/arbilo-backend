@@ -4,7 +4,7 @@ const cryptoPriceFetcher = require('../services/CryptoPriceFetcher');
 const combinedMiddleware = require("../middleware/userMiddleware")
 
 const router = express.Router();
-const cryptoService = new CryptoArbitrageService();
+
 const priceFetcher = new cryptoPriceFetcher();
 
 
@@ -29,20 +29,18 @@ router.get('/arbitrack', async (req, res) => {
 });
 
 // ✅ Keep this AFTER '/arbitrack' so it does not override
-router.get('/:investment?',combinedMiddleware, async (req, res) => {
+router.get('/:investment?', combinedMiddleware, async (req, res) => {
   try {
-    let investment = parseFloat(req.params.investment);
-
-    if (isNaN(investment) || investment <= 0) {
-      investment = 1000; // Default investment amount
-    }
+    const cryptoService = new CryptoArbitrageService(); // Now instantiated only when needed
+    let investment = parseFloat(req.params.investment) || 100000; // Default investment
 
     const opportunities = await cryptoService.getArbitrageOpportunities(investment);
     res.json(opportunities);
   } catch (error) {
-    console.error('Error processing arbitrage opportunities request:', error);
-    res.status(500).json({ error: 'Internal server error while fetching arbitrage opportunities' });
+    console.error('Error calculating arbitrage opportunities:', error);
+    res.status(500).json({ error: 'Failed to calculate arbitrage opportunities' });
   }
 });
+
 
 module.exports = router;
