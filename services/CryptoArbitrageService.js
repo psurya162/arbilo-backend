@@ -26,28 +26,27 @@ class CryptoArbitrageService {
             'ascendex',
             'bitget',
         ];
-        
-        
 
         this.coinSymbols = [
             'BTC', 'ETH', 'XRP', 'ADA', 'DOT', 'SOL', 'DOGE', 'SHIB', 'LTC', 'LINK',
             'MATIC', 'AVAX', 'XLM', 'UNI', 'BCH', 'FIL', 'VET', 'ALGO', 'ATOM', 'ICP'
         ];
 
+        this.MIN_VOLUME = 200000; // Minimum 24h volume in USDT
         this.MAX_RETRIES = 3;
-        this.RETRY_DELAY = 500; // 500ms delay before retry
-        this.exchanges = {}; // Stores initialized exchange instances
+        this.RETRY_DELAY = 500;
+        this.exchanges = {};
     }
 
     async initializeExchange(exchangeName) {
         try {
             if (!this.exchanges[exchangeName]) {
-                this.exchanges[exchangeName] = new ccxt[exchangeName]({ timeout: 20000 }); // 20 sec timeout
+                this.exchanges[exchangeName] = new ccxt[exchangeName]({ timeout: 20000 });
                 await this.exchanges[exchangeName].loadMarkets();
             }
         } catch (err) {
             console.warn(`⚠️ Skipping ${exchangeName}: ${err.message}`);
-            delete this.exchanges[exchangeName]; // Remove failed exchange
+            delete this.exchanges[exchangeName];
         }
     }
 
@@ -55,28 +54,32 @@ class CryptoArbitrageService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async fetchPricesWithRetry(exchange, pair, retries = 0) {
+    async fetchMarketDataWithRetry(exchange, pair, retries = 0) {
         try {
-            await this.delay(this.RETRY_DELAY); // Add a delay between retries
+            await this.delay(this.RETRY_DELAY);
             const ticker = await exchange.fetchTicker(pair);
-            return ticker.last;
+            return {
+                price: ticker.last,
+                volume: ticker.quoteVolume || ticker.baseVolume * ticker.last, // Convert to USDT volume if needed
+                timestamp: Date.now()
+            };
         } catch (error) {
             if (retries < this.MAX_RETRIES) {
                 console.log(`🔄 Retrying ${pair} on ${exchange.name} (${retries + 1}/${this.MAX_RETRIES})`);
-                await this.delay(this.RETRY_DELAY * (retries + 1)); // Exponential backoff
-                return this.fetchPricesWithRetry(exchange, pair, retries + 1);
+                await this.delay(this.RETRY_DELAY * (retries + 1));
+                return this.fetchMarketDataWithRetry(exchange, pair, retries + 1);
             }
             console.error(`❌ Failed to fetch ${pair} from ${exchange.name}: ${error.message}`);
-            return null; // Return null instead of failing the whole process
+            return null;
         }
     }
 
     async fetchExchangePrices(exchangeName) {
         await this.initializeExchange(exchangeName);
         const exchange = this.exchanges[exchangeName];
-        if (!exchange) return {}; // Skip if initialization failed
+        if (!exchange) return {};
 
-        const prices = {};
+        const marketData = {};
         const fetchPromises = this.coinSymbols.map(async (coin) => {
             const pair = `${coin}/USDT`;
             if (!exchange.markets[pair]) {
@@ -85,27 +88,31 @@ class CryptoArbitrageService {
             }
 
             try {
-                const price = await this.fetchPricesWithRetry(exchange, pair);
-                if (price) prices[coin] = { price, timestamp: Date.now() };
+                const data = await this.fetchMarketDataWithRetry(exchange, pair);
+                if (data && data.volume >= this.MIN_VOLUME) {
+                    marketData[coin] = data;
+                } else if (data) {
+                    console.log(`⚠️ ${pair} on ${exchangeName} has insufficient volume (${data.volume.toFixed(2)} USDT)`);
+                }
             } catch (err) {
                 console.log(`❌ Error fetching ${pair} from ${exchangeName}: ${err.message}`);
             }
         });
 
         await Promise.all(fetchPromises);
-        return prices;
+        return marketData;
     }
 
     async fetchAllPrices() {
         const cryptoData = {};
         const exchangePromises = this.exchangeNames.map(async (exchangeName) => {
             try {
-                const prices = await this.fetchExchangePrices(exchangeName);
-                if (Object.keys(prices).length > 0) {
-                    cryptoData[exchangeName] = prices;
+                const marketData = await this.fetchExchangePrices(exchangeName);
+                if (Object.keys(marketData).length > 0) {
+                    cryptoData[exchangeName] = marketData;
                 }
             } catch (err) {
-                console.error(`❌ Error fetching prices from ${exchangeName}:`, err.message);
+                console.error(`❌ Error fetching data from ${exchangeName}:`, err.message);
             }
         });
 
@@ -144,7 +151,8 @@ class CryptoArbitrageService {
 
         for (const [coin1, coin2] of coinPairs) {
             const validExchanges = this.exchangeNames.filter(exchange =>
-                cryptoData[exchange]?.[coin1]?.price > 0 && cryptoData[exchange]?.[coin2]?.price > 0
+                cryptoData[exchange]?.[coin1]?.price > 0 && 
+                cryptoData[exchange]?.[coin2]?.price > 0
             );
 
             if (validExchanges.length < 2) continue;
@@ -152,8 +160,15 @@ class CryptoArbitrageService {
             const opportunities = validExchanges.map(exchange => ({
                 exchange,
                 price1: cryptoData[exchange][coin1]?.price,
-                price2: cryptoData[exchange][coin2]?.price
-            })).filter(o => o.price1 && o.price2);
+                price2: cryptoData[exchange][coin2]?.price,
+                volume1: cryptoData[exchange][coin1]?.volume,
+                volume2: cryptoData[exchange][coin2]?.volume
+            })).filter(o => 
+                o.price1 && 
+                o.price2 && 
+                o.volume1 >= this.MIN_VOLUME && 
+                o.volume2 >= this.MIN_VOLUME
+            );
 
             if (opportunities.length < 2) continue;
 
@@ -180,6 +195,10 @@ class CryptoArbitrageService {
                         minPrice2: Number(minOpp.price2.toFixed(8)),
                         maxPrice1: Number(maxOpp.price1.toFixed(8)),
                         maxPrice2: Number(maxOpp.price2.toFixed(8)),
+                        volume1Min: Number(minOpp.volume1.toFixed(2)),
+                        volume2Min: Number(minOpp.volume2.toFixed(2)),
+                        volume1Max: Number(maxOpp.volume1.toFixed(2)),
+                        volume2Max: Number(maxOpp.volume2.toFixed(2)),
                         profit: Number(profit.profit.toFixed(2)),
                         profitPercentage: Number(profit.profitPercentage.toFixed(2)),
                         investmentAmount: initialInvestment
@@ -193,9 +212,9 @@ class CryptoArbitrageService {
 
     async getArbitrageOpportunities(investment) {
         try {
-            console.log("🔍 Fetching crypto prices...");
+            console.log("🔍 Fetching crypto prices and volumes...");
             const cryptoData = await this.fetchAllPrices();
-            console.log("✅ Prices fetched. Calculating arbitrage opportunities...");
+            console.log("✅ Data fetched. Calculating arbitrage opportunities...");
             const results = this.calculateArbitrageProfit(cryptoData, investment);
             return { results: results.slice(0, 20), lastUpdated: new Date().toISOString() };
         } catch (error) {
