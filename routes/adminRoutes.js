@@ -3,6 +3,7 @@ const router = express.Router();
 const {adminLogin,adminSignup,getAllUsers,toggleUserActiveStatus ,getAdminProfile,updateAdminProfile} = require("../controllers/adminController");
 const adminAuthMiddleware = require("../middleware/adminMiddleware");
 
+
 // Admin Registration
 router.post("/signup", adminSignup);
 
