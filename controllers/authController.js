@@ -10,9 +10,10 @@ const {
   sendContactUsNotification,
 } = require("../services/emailService");
 const generator = require("generate-password");
+require('dotenv').config();
 
 // Secret for JWT
-const JWT_SECRET = "dfghjnhbgvf";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // User Signup
 const signup = async (req, res) => {

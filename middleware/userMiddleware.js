@@ -1,3 +1,4 @@
+require('dotenv').config(); // Load environment variables
 const jwt = require('jsonwebtoken');
 
 const combinedMiddleware = (req, res, next) => {
@@ -17,11 +18,11 @@ const combinedMiddleware = (req, res, next) => {
         let source;
 
         try {
-            decodedToken = jwt.verify(token, 'kjhgfghj'); // Signup secret
+            decodedToken = jwt.verify(token, process.env.JWT_SIGNUP_SECRET); // Signup secret
             source = 'signup';
         } catch (signupErr) {
             console.warn('Signup token verification failed, trying login secret...');
-            decodedToken = jwt.verify(token, 'dfghjnhbgvf'); // Login secret
+            decodedToken = jwt.verify(token, process.env.JWT_LOGIN_SECRET); // Login secret
             source = 'login';
         }
 

@@ -1,6 +1,9 @@
 const jwt = require("jsonwebtoken");
-const JWT_SECRET = "dfghjnhbgvf"; // Ensure this matches the secret used in login
-const db = require("../config/db_settings"); // Ensure the correct db import
+const db = require("../config/db_settings"); 
+require('dotenv').config();
+const JWT_SECRET = "dfghjnhbgvf"; 
+
+
 
 const adminAuthMiddleware = async (req, res, next) => {
   try {
