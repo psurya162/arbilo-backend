@@ -2,7 +2,9 @@ const db = require("../config/db_settings");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
-const nodemailer = require("nodemailer");
+const transporter = require("./mailer")
+const cron = require('node-cron');
+const { format } = require('date-fns');
 const {
   sendCredentialsEmail,
   sendPasswordChangeNotification,
@@ -10,10 +12,10 @@ const {
   sendContactUsNotification,
 } = require("../services/emailService");
 const generator = require("generate-password");
-require('dotenv').config();
+const {jwtSecret} = require('../config/dotenvConfig')
 
 // Secret for JWT
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = jwtSecret;
 
 // User Signup
 const signup = async (req, res) => {
@@ -174,15 +176,7 @@ const forgotPassword = async (req, res) => {
       { expiresIn: "5m" }
     );
 
-    const transporter = nodemailer.createTransport({
-      host: "smtp.hostinger.com",
-      port: 465,
-      secure: true, // Use SSL
-      auth: {
-        user: "hello@arbilo.com",
-        pass: "Readyio@986",
-      },
-    });
+   
 
   
 
@@ -352,7 +346,46 @@ const changePassword = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+const updateSubscriptionStatuses = async () => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Format date for SQL comparison
+    const formattedDate = format(today, 'yyyy-MM-dd');
 
+    // Activate subscriptions starting today
+    await db.query(`
+      UPDATE tbl_users 
+      SET is_active = 1,
+          subscription_status = 'active'
+      WHERE 
+        DATE(subscription_start_date) = ? 
+        AND is_active = 0
+    `, [formattedDate]);
+
+    // Deactivate expired subscriptions
+    await db.query(`
+      UPDATE tbl_users 
+      SET is_active = 0,
+          subscription_status = 'expired'
+      WHERE 
+        DATE(subscription_end_date) < ? 
+        AND is_active = 1
+    `, [formattedDate]);
+
+    console.log(`Subscription status check completed for ${formattedDate}`);
+  } catch (error) {
+    console.error('Error updating subscription statuses:', error);
+  }
+};
+
+
+
+// Run every minute
+cron.schedule('* * * * *', () => {
+  updateSubscriptionStatuses();
+});
 
 const createUserAndSendCredentials = async (req, res) => {
   try {
@@ -367,7 +400,7 @@ const createUserAndSendCredentials = async (req, res) => {
     // Validate start date (must be today or in the future)
     const subscriptionStartDate = new Date(start_date);
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Remove time for accurate comparison
+    today.setHours(0, 0, 0, 0);
 
     if (subscriptionStartDate < today) {
       return res.status(400).json({
@@ -392,7 +425,7 @@ const createUserAndSendCredentials = async (req, res) => {
 
     // Send email first before saving data
     try {
-      await sendCredentialsEmail(name, email, password); // Sending email first
+      await sendCredentialsEmail(name, email, password);
     } catch (emailError) {
       console.error("Error sending credentials email:", emailError);
       return res.status(500).json({ message: "Failed to send email. Try again." });
@@ -411,27 +444,34 @@ const createUserAndSendCredentials = async (req, res) => {
       return res.status(400).json({ message: "Invalid subscription type" });
     }
 
-    // Insert new user into the database (only if email was sent successfully)
+    // Always set initial is_active to 0, it will be updated by cron job
     await db.insert("tbl_users", {
       email,
       name,
       password: hashedPassword,
       subscription_type,
-      subscription_status: "active",
+      subscription_status: "pending",
       subscription_start_date: subscriptionStartDate,
       subscription_end_date: subscriptionEndDate,
-      is_active: 1,
+      is_active: 0, // Initially set to 0
     });
 
-    res.status(201).json({ message: "User created and credentials sent successfully" });
+    res.status(201).json({ 
+      message: "User created and credentials sent successfully",
+      subscription_details: {
+        start_date: format(subscriptionStartDate, 'yyyy-MM-dd'),
+        end_date: format(subscriptionEndDate, 'yyyy-MM-dd'),
+        is_active: 0,
+        subscription_status: "pending"
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
-
-// Contact Us - Handle form submission
+// Contact Us endpoint
 const contactUs = async (req, res) => {
   try {
     const { name, email, message } = req.body;
@@ -454,18 +494,15 @@ const contactUs = async (req, res) => {
     // Send an email notification to the admin
     await sendContactUsNotification(name, email, message);
 
-    // Return success response
-    res
-      .status(201)
-      .json({
-        message:
-          "Your message has been received. We'll get back to you shortly!",
-      });
+    res.status(201).json({
+      message: "Your message has been received. We'll get back to you shortly!"
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 module.exports = {
   signup,
@@ -477,4 +514,5 @@ module.exports = {
   changePassword,
   createUserAndSendCredentials,
   contactUs,
+  
 };

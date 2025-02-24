@@ -1,5 +1,5 @@
 const mysql = require('mysql');
-require('dotenv').config();
+const {dbHost,dbName,dbPass,dbUser} = require("./dotenvConfig")
 
 class Database {
     constructor() {
@@ -7,10 +7,10 @@ class Database {
         // this.username = 'root';
         // this.password = '';
         // this.database = 'db_arbilo';
-        this.host = process.env.DB_HOST; 
-        this.username = process.env.DB_USER; 
-        this.password = process.env.DB_PASS; 
-        this.database = process.env.DB_NAME; 
+        this.host = dbHost; 
+        this.username =dbUser; 
+        this.password = dbPass; 
+        this.database = dbName; 
         this.conn = mysql.createConnection({
             host: this.host,
             user: this.username,

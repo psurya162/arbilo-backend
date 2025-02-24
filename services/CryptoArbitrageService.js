@@ -32,7 +32,7 @@ class CryptoArbitrageService {
             'MATIC', 'AVAX', 'XLM', 'UNI', 'BCH', 'FIL', 'VET', 'ALGO', 'ATOM', 'ICP'
         ];
 
-        this.MIN_VOLUME = 200000; // Minimum 24h volume in USDT
+        this.MIN_VOLUME = 100000; // Minimum 24h volume in USDT
         this.MAX_RETRIES = 3;
         this.RETRY_DELAY = 500;
         this.exchanges = {};

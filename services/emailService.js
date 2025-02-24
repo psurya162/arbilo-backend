@@ -1,15 +1,7 @@
-const nodemailer = require("nodemailer");
 
-// Configure transporter for Hostinger SMTP
-const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true, // Use SSL
-  auth: {
-    user: "hello@arbilo.com",
-    pass: "Readyio@986",
-  },
-});
+const transporter = require("./mailer")
+
+
 const sendWelcomeEmail = async (name, email) => {
   try {
     const mailOptions = {
@@ -155,15 +147,7 @@ const sendCredentialsEmail = async (name, email, password) => {
 
 const sendContactUsNotification = async (name, email, message) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: "smtp.hostinger.com",
-      port: 465,
-      secure: true, // Use SSL
-      auth: {
-        user: "hello@arbilo.com", // Must be a verified email from your domain
-        pass: "Readyio@986",
-      },
-    });
+   
 
     const adminEmail = "hello@arbilo.com"; // Admin's receiving email
     const subject = "New Contact Us Message";

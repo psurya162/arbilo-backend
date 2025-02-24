@@ -2,10 +2,10 @@ const db = require("../config/db_settings");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
-require('dotenv').config();
+const {jwtSecret}  = require("../config/dotenvConfig")
 
 // Secret for JWT
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = jwtSecret;
 
 // Admin Signup
 const adminSignup = async (req, res) => {

@@ -1,18 +1,19 @@
 const redis = require("redis");
+const { redisHost, redisPort } = require("./dotenvConfig");
 
-// Create Redis Client
 const client = redis.createClient({
   socket: {
-    host: "145.223.23.3", // Your VPS IP
-    port: 6379, // Redis default port
-  }
+    host: redisHost,
+    port: redisPort,
+  },
 });
 
 client.on("error", (err) => {
   console.error("❌ Redis Connection Error:", err);
 });
 
-// Connect to Redis
-client.connect().then(() => console.log("✅ Connected to Redis"));
+client.connect()
+  .then(() => console.log("✅ Connected to Redis"))
+  .catch((err) => console.error("❌ Redis Connection Failed:", err));
 
 module.exports = client;
