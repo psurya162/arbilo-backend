@@ -16,4 +16,6 @@ module.exports = {
   smtpPort: process.env.SMTP_PORT,
   smtpUser: process.env.SMTP_USER,
   smtpPass: process.env.SMTP_PASS,
+  cryptoPanicKey:process.env.CRYPTO_PANIC_API_KEY,
+  newsApiKey:process.env.NEWSAPI_KEY
 };

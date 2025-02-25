@@ -2,9 +2,8 @@ const db = require("../config/db_settings");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
-const transporter = require("./mailer")
-const cron = require('node-cron');
-const { format } = require('date-fns');
+const { format} = require('date-fns');
+const transporter = require('../services/mailer')
 const {
   sendCredentialsEmail,
   sendPasswordChangeNotification,
@@ -346,46 +345,6 @@ const changePassword = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
-const updateSubscriptionStatuses = async () => {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Format date for SQL comparison
-    const formattedDate = format(today, 'yyyy-MM-dd');
-
-    // Activate subscriptions starting today
-    await db.query(`
-      UPDATE tbl_users 
-      SET is_active = 1,
-          subscription_status = 'active'
-      WHERE 
-        DATE(subscription_start_date) = ? 
-        AND is_active = 0
-    `, [formattedDate]);
-
-    // Deactivate expired subscriptions
-    await db.query(`
-      UPDATE tbl_users 
-      SET is_active = 0,
-          subscription_status = 'expired'
-      WHERE 
-        DATE(subscription_end_date) < ? 
-        AND is_active = 1
-    `, [formattedDate]);
-
-    console.log(`Subscription status check completed for ${formattedDate}`);
-  } catch (error) {
-    console.error('Error updating subscription statuses:', error);
-  }
-};
-
-
-
-// Run every minute
-cron.schedule('* * * * *', () => {
-  updateSubscriptionStatuses();
-});
 
 const createUserAndSendCredentials = async (req, res) => {
   try {
@@ -423,53 +382,57 @@ const createUserAndSendCredentials = async (req, res) => {
       lowercase: true,
     });
 
-    // Send email first before saving data
-    try {
-      await sendCredentialsEmail(name, email, password);
-    } catch (emailError) {
-      console.error("Error sending credentials email:", emailError);
-      return res.status(500).json({ message: "Failed to send email. Try again." });
-    }
+    // First, send the credentials email
+    await sendCredentialsEmail(name, email, password)
+      .then(async () => {
+        // Email sent successfully, now hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
+        // Calculate subscription end date
+        let subscriptionEndDate = new Date(subscriptionStartDate);
+        if (subscription_type === "monthly") {
+          subscriptionEndDate.setMonth(subscriptionStartDate.getMonth() + 1);
+        } else if (subscription_type === "quarterly") {
+          subscriptionEndDate.setMonth(subscriptionStartDate.getMonth() + 3);
+        } else {
+          return res.status(400).json({ message: "Invalid subscription type" });
+        }
 
-    // Calculate subscription end date
-    let subscriptionEndDate = new Date(subscriptionStartDate);
-    if (subscription_type === "monthly") {
-      subscriptionEndDate.setMonth(subscriptionStartDate.getMonth() + 1);
-    } else if (subscription_type === "quarterly") {
-      subscriptionEndDate.setMonth(subscriptionStartDate.getMonth() + 3);
-    } else {
-      return res.status(400).json({ message: "Invalid subscription type" });
-    }
+        // Determine if subscription should be active based on start date
+        const isActive = subscriptionStartDate.toDateString() === today.toDateString() ? 1 : 0;
 
-    // Always set initial is_active to 0, it will be updated by cron job
-    await db.insert("tbl_users", {
-      email,
-      name,
-      password: hashedPassword,
-      subscription_type,
-      subscription_status: "pending",
-      subscription_start_date: subscriptionStartDate,
-      subscription_end_date: subscriptionEndDate,
-      is_active: 0, // Initially set to 0
-    });
+        // Insert new user into the database
+        await db.insert("tbl_users", {
+          email,
+          name,
+          password: hashedPassword,
+          subscription_type,
+          subscription_status: isActive ? "active" : "pending",
+          subscription_start_date: subscriptionStartDate,
+          subscription_end_date: subscriptionEndDate,
+          is_active: isActive,
+        });
 
-    res.status(201).json({ 
-      message: "User created and credentials sent successfully",
-      subscription_details: {
-        start_date: format(subscriptionStartDate, 'yyyy-MM-dd'),
-        end_date: format(subscriptionEndDate, 'yyyy-MM-dd'),
-        is_active: 0,
-        subscription_status: "pending"
-      }
-    });
+        res.status(201).json({
+          message: "User created and credentials sent successfully",
+          subscription_details: {
+            start_date: format(subscriptionStartDate, "yyyy-MM-dd"),
+            end_date: format(subscriptionEndDate, "yyyy-MM-dd"),
+            is_active: isActive,
+            subscription_status: isActive ? "active" : "pending",
+          },
+        });
+      })
+      .catch((emailError) => {
+        console.error("Error sending credentials email:", emailError);
+        return res.status(500).json({ message: "Failed to send email. Try again." });
+      });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 
 // Contact Us endpoint
 const contactUs = async (req, res) => {
@@ -503,6 +466,44 @@ const contactUs = async (req, res) => {
   }
 };
 
+// Cron job to update subscription statuses
+const updateSubscriptionStatuses = async () => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Format date for SQL comparison
+    const formattedDate = format(today, 'yyyy-MM-dd');
+
+    // Activate subscriptions starting today
+    await db.query(`
+      UPDATE tbl_users 
+      SET is_active = 1,
+          subscription_status = 'active'
+      WHERE 
+        DATE(subscription_start_date) = ? 
+        AND is_active = 0
+    `, [formattedDate]);
+
+    // Deactivate expired subscriptions
+    await db.query(`
+      UPDATE tbl_users 
+      SET is_active = 0,
+          subscription_status = 'expired'
+      WHERE 
+        DATE(subscription_end_date) < ? 
+        AND is_active = 1
+    `, [formattedDate]);
+
+    console.log(`Subscription status check completed for ${formattedDate}`);
+  } catch (error) {
+    console.error('Error updating subscription statuses:', error);
+  }
+};
+
+// Set up cron job (if using node-cron)
+// require('node-cron').schedule('0 0 * * *', updateSubscriptionStatuses);
+
 
 module.exports = {
   signup,
@@ -514,5 +515,5 @@ module.exports = {
   changePassword,
   createUserAndSendCredentials,
   contactUs,
-  
+  updateSubscriptionStatuses
 };

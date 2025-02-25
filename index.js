@@ -3,6 +3,7 @@ const cors = require("cors")
 const adminRoutes = require('./routes/adminRoutes');
 const authRoutes = require('./routes/authRoutes');
 const arbitrageRoutes = require('./routes/arbitrageRoutes');
+const sentimentsRoutes = require("./routes/sentimentRoutes")
 // const sentimentsRoutes = require("./routes/sentimentRoutes")
 
 
@@ -20,7 +21,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/arbitrage', arbitrageRoutes);
-// app.use('/api/sentiments',sentimentsRoutes)
+app.use('/api/crypto',sentimentsRoutes)
 
 
 
