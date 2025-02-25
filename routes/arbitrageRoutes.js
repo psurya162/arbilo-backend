@@ -3,6 +3,7 @@ const CryptoArbitrageService = require('../services/CryptoArbitrageService');
 const CryptoPriceFetcher = require('../services/CryptoPriceFetcher');
 const CacheService = require('../services/CacheService');
 const router = express.Router();
+const combinedMiddleware = require('../middleware/userMiddleware');
 
 const priceFetcher = new CryptoPriceFetcher();
 
@@ -25,7 +26,7 @@ CacheService.refreshCachePeriodically(fetchAndProcessData, CacheService.CACHE_KE
 CacheService.refreshCachePeriodically(fetchArbitrageData, CacheService.CACHE_KEYS.ARBI_PAIR);
 
 // API Endpoints
-router.get('/arbitrack', async (req, res) => {
+router.get('/arbitrack',combinedMiddleware, async (req, res) => {
     try {
         const data = await CacheService.getOrSetCache(
             CacheService.CACHE_KEYS.ARBI_TRACK,
@@ -38,7 +39,7 @@ router.get('/arbitrack', async (req, res) => {
     }
 });
 
-router.get('/:investment?', async (req, res) => {
+router.get('/:investment?',combinedMiddleware, async (req, res) => {
     try {
         const investment = parseFloat(req.params.investment) || 100000;
 

@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const CryptoSentimentService = require('../services/CryptoSentimentService');
-
+const combinedMiddleware = require('../middleware/userMiddleware');
 // Initialize the service - this will automatically start caching
 const cryptoSentimentService = new CryptoSentimentService();
 
-router.get('/sentiment', async (req, res) => {
+router.get('/sentiment',combinedMiddleware, async (req, res) => {
   try {
     // This will use cached data from the service
     const results = await cryptoSentimentService.getSentimentAnalysis();
@@ -24,7 +24,7 @@ router.get('/sentiment', async (req, res) => {
   }
 });
 
-router.get('/sentiment/:symbol', async (req, res) => {
+router.get('/sentiment/:symbol',combinedMiddleware, async (req, res) => {
   try {
     const symbol = req.params.symbol.toUpperCase();
     
